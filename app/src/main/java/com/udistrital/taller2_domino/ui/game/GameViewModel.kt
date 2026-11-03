@@ -49,7 +49,8 @@ class GameViewModel(
 
             build(
                 chain = current.chain.place(tile, side),
-                hand = current.hand - tile
+                hand = current.hand - tile,
+                boneyard = current.boneyard
             )
         }
     }
@@ -58,20 +59,45 @@ class GameViewModel(
         _uiState.value = newGame()
     }
 
-    // ---------- Helpers privados ----------
-
-    private fun newGame(): GameUiState =
-        build(Chain(), initialHand ?: DominoSet.full().shuffled().take(7))
-
-    private fun build(chain: Chain, hand: List<Tile>): GameUiState {
+    private fun newGame(): GameUiState {
+        val fullSet = (initialHand ?: DominoSet.full()).shuffled()
+        val hand = fullSet.take(7)
+        val boneyard = fullSet.drop(7) // Las 21 fichas restantes van al pozo
+        return build(Chain(), hand, boneyard)
+    }
+    private fun build(chain: Chain, hand: List<Tile>, boneyard: List<Tile>): GameUiState {
         val playable = hand
             .filter { chain.canPlace(it, Side.Left) || chain.canPlace(it, Side.Right) }
             .toSet()
+
+        val message = when {
+            hand.isEmpty() -> "¡Te quedaste sin fichas! ¡Ganaste!"
+            playable.isEmpty() && boneyard.isNotEmpty() -> "No tienes fichas jugables. ¡Roba una del pozo!"
+            playable.isEmpty() && boneyard.isEmpty() -> "No tienes jugadas ni fichas en el pozo. ¡Pasa turno!"
+            else -> null
+        }
+
         return GameUiState(
             chain = chain,
             hand = hand,
+            boneyard = boneyard,
             playableTiles = playable,
-            message = if (hand.isEmpty()) "¡Te quedaste sin fichas!" else null
+            message = message
         )
     }
+
+    fun onDrawTile(){
+        _uiState.update {current ->
+            if (current.boneyard.isEmpty()) return@update current
+
+            val drawTile=current.boneyard.first()
+            val newBoneyard= current.boneyard.drop(1)
+            val newHand= current.hand + drawTile
+
+            build(current.chain, newHand, newBoneyard)
+
+        }
+    }
+
+
 }

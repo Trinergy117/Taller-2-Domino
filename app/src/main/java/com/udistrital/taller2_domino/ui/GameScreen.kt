@@ -69,6 +69,17 @@ fun GameScreen(
         }
 
         Spacer(Modifier.height(16.dp))
+
+        Row(){
+            OutlinedButton(
+                onClick = viewModel::onDrawTile,
+                enabled = state.canDraw
+            ) {
+                Text("Pozo:${state.boneyard.size} fichas")
+                Text(" ---  Comer ficha")
+            }
+        }
+
         Text("Tu mano", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
 
