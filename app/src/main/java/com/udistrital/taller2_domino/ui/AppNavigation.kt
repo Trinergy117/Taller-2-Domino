@@ -65,7 +65,8 @@ fun AppNavigation(
         composable("game") {
             GameScreen(
                 roomCode = null,
-                localUserId = currentUser?.uid ?: "p1"
+                localUserId = currentUser?.uid ?: "p1",
+                onBackToMenu = { navController.navigate("menu") { popUpTo("menu") { inclusive = true } } }
             )
         }
         composable(
@@ -75,7 +76,8 @@ fun AppNavigation(
             val roomCode = backStackEntry.arguments?.getString("roomCode")
             GameScreen(
                 roomCode = roomCode,
-                localUserId = currentUser?.uid ?: ""
+                localUserId = currentUser?.uid ?: "",
+                onBackToMenu = { navController.navigate("menu") { popUpTo("menu") { inclusive = true } } }
             )
         }
         composable("saved") { Text("Partidas guardadas") }

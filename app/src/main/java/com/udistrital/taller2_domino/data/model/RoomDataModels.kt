@@ -111,7 +111,8 @@ data class GameRoomDto(
     val territoryBoardCols: Int = 6,
     val territorySquares: List<TerritorySquareDto> = emptyList(),
     val players: List<PlayerDto> = emptyList(),
-    val winnerId: String? = null
+    val winnerId: String? = null,
+    val restartRequestedBy: String? = null
 ) {
     fun toTerritoryBoard(): TerritoryBoard {
         val gridMap = territorySquares.associate { squareDto ->

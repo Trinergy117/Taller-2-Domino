@@ -19,7 +19,11 @@ data class GameUiState(
     val enabledSides: Set<Side> = emptySet(),
     val message: String? = null,
     val isGameOver: Boolean = false,
-    val winner: Player? = null
+    val winner: Player? = null,
+    val isAbandoned: Boolean = false,
+    val abandonedByName: String? = null,
+    val restartRequestedBy: String? = null,
+    val restartRequestedByName: String? = null
 ) {
     val isOnlineGame: Boolean get() = !roomCode.isNullOrBlank()
     val currentPlayer: Player? get() = players.getOrNull(currentTurnIndex)
@@ -27,6 +31,9 @@ data class GameUiState(
 
     val localPlayer: Player? get() = if (isOnlineGame) players.find { it.id == localUserId } else currentPlayer
     val localHand: List<Tile> get() = localPlayer?.hand ?: emptyList()
+
+    val isRestartRequestedByOpponent: Boolean get() = isOnlineGame && restartRequestedBy != null && restartRequestedBy != localUserId
+    val isWaitingRestartResponse: Boolean get() = isOnlineGame && restartRequestedBy != null && restartRequestedBy == localUserId
 
     val canDraw: Boolean get() = boneyard.isNotEmpty() && playableTiles.isEmpty() && isMyTurn
 

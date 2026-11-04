@@ -46,8 +46,24 @@ class GameViewModel(
                         val board = roomDto.toTerritoryBoard()
                         val players = roomDto.players.map { it.toDomain() }
                         val boneyard = roomDto.boneyard.map { it.toDomain() }
-                        val isGameOver = roomDto.status == "FINISHED"
-                        val winner = if (isGameOver) players.find { it.id == roomDto.winnerId } else null
+                        val isAbandoned = roomDto.status == "ABANDONED"
+                        val isGameOver = roomDto.status == "FINISHED" || isAbandoned
+
+                        val winner = if (isGameOver) {
+                            players.find { it.id == roomDto.winnerId }
+                        } else null
+
+                        val abandonedBy = if (isAbandoned) {
+                            players.find { it.id != localUserId }?.name ?: "El oponente"
+                        } else null
+
+                        val restartRequestorName = players.find { it.id == roomDto.restartRequestedBy }?.name
+
+                        val message = when {
+                            isAbandoned -> "¡El oponente $abandonedBy ha abandonado la partida!"
+                            roomDto.status == "FINISHED" -> "¡Partida finalizada! Ganador: ${winner?.name ?: ""}"
+                            else -> current.message
+                        }
 
                         current.copy(
                             territoryBoard = board,
@@ -55,7 +71,12 @@ class GameViewModel(
                             currentTurnIndex = roomDto.currentTurnIndex,
                             boneyard = boneyard,
                             isGameOver = isGameOver,
-                            winner = winner
+                            isAbandoned = isAbandoned,
+                            abandonedByName = abandonedBy,
+                            restartRequestedBy = roomDto.restartRequestedBy,
+                            restartRequestedByName = restartRequestorName,
+                            winner = winner,
+                            message = message
                         )
                     }
                 }
@@ -71,13 +92,18 @@ class GameViewModel(
             return
         }
 
-        _uiState.update { state ->
-            if (state.territoryBoard.isBoardEmpty) {
-                val randomRow = (0 until state.territoryBoard.rows).random()
-                val randomCol = (0 until state.territoryBoard.cols).random()
-                return@update executeTilePlacement(state, tile, randomRow, randomCol)
+        if (current.territoryBoard.isBoardEmpty) {
+            val randomRow = (0 until current.territoryBoard.rows).random()
+            val randomCol = (0 until current.territoryBoard.cols).random()
+            val newState = executeTilePlacement(current, tile, randomRow, randomCol)
+            _uiState.value = newState
+            if (newState.isOnlineGame && roomCode != null) {
+                syncStateToFirestore(roomCode, newState)
             }
+            return
+        }
 
+        _uiState.update { state ->
             if (state.selectedTile == tile) {
                 state.copy(
                     selectedTile = null,
@@ -210,9 +236,105 @@ class GameViewModel(
                 territoryBoardCols = state.territoryBoard.cols,
                 territorySquares = state.territoryBoard.toSquareDtoList(),
                 players = state.players.map { it.toDto() },
-                winnerId = state.winner?.id
+                winnerId = state.winner?.id,
+                restartRequestedBy = state.restartRequestedBy
             )
             multiplayerRepository?.updateGameState(code, roomDto)
+        }
+    }
+
+    fun onRequestRestart() {
+        val current = _uiState.value
+        if (!current.isOnlineGame || roomCode == null || localUserId == null) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(restartRequestedBy = localUserId) }
+            val roomDto = GameRoomDto(
+                code = roomCode,
+                hostId = current.players.getOrNull(0)?.id ?: "",
+                hostName = current.players.getOrNull(0)?.name ?: "",
+                guestId = current.players.getOrNull(1)?.id ?: "",
+                guestName = current.players.getOrNull(1)?.name ?: "",
+                status = if (current.isGameOver) "FINISHED" else "PLAYING",
+                currentTurnIndex = current.currentTurnIndex,
+                boneyard = current.boneyard.map { it.toDto() },
+                territoryBoardRows = current.territoryBoard.rows,
+                territoryBoardCols = current.territoryBoard.cols,
+                territorySquares = current.territoryBoard.toSquareDtoList(),
+                players = current.players.map { it.toDto() },
+                winnerId = current.winner?.id,
+                restartRequestedBy = localUserId
+            )
+            multiplayerRepository?.updateGameState(roomCode, roomDto)
+        }
+    }
+
+    fun onAcceptRestart() {
+        val current = _uiState.value
+        if (!current.isOnlineGame || roomCode == null) return
+
+        val fullSet = DominoSet.full().shuffled()
+        val p1Hand = fullSet.take(7)
+        val p2Hand = fullSet.drop(7).take(7)
+        val newBoneyard = fullSet.drop(14)
+
+        val p1 = current.players.getOrNull(0)?.copy(hand = p1Hand, score = 0)
+            ?: Player(id = "p1", name = "Jugador 1", colorHex = 0xFF2196F3, hand = p1Hand)
+        val p2 = current.players.getOrNull(1)?.copy(hand = p2Hand, score = 0)
+            ?: Player(id = "p2", name = "Jugador 2", colorHex = 0xFFE91E63, hand = p2Hand)
+
+        val newBoard = TerritoryBoard.createRandom(6, 6)
+
+        viewModelScope.launch {
+            val roomDto = GameRoomDto(
+                code = roomCode,
+                hostId = p1.id,
+                hostName = p1.name,
+                guestId = p2.id,
+                guestName = p2.name,
+                status = "PLAYING",
+                currentTurnIndex = 0,
+                boneyard = newBoneyard.map { it.toDto() },
+                territoryBoardRows = newBoard.rows,
+                territoryBoardCols = newBoard.cols,
+                territorySquares = newBoard.toSquareDtoList(),
+                players = listOf(p1.toDto(), p2.toDto()),
+                winnerId = null,
+                restartRequestedBy = null
+            )
+            multiplayerRepository?.updateGameState(roomCode, roomDto)
+        }
+    }
+
+    fun onAbandonGame() {
+        val current = _uiState.value
+        val opponent = current.players.find { it.id != localUserId }
+        val newState = current.copy(
+            isGameOver = true,
+            isAbandoned = true,
+            message = "Has abandonado la partida."
+        )
+        _uiState.value = newState
+
+        if (current.isOnlineGame && roomCode != null) {
+            viewModelScope.launch {
+                val roomDto = GameRoomDto(
+                    code = roomCode,
+                    hostId = current.players.getOrNull(0)?.id ?: "",
+                    hostName = current.players.getOrNull(0)?.name ?: "",
+                    guestId = current.players.getOrNull(1)?.id ?: "",
+                    guestName = current.players.getOrNull(1)?.name ?: "",
+                    status = "ABANDONED",
+                    currentTurnIndex = current.currentTurnIndex,
+                    boneyard = current.boneyard.map { it.toDto() },
+                    territoryBoardRows = current.territoryBoard.rows,
+                    territoryBoardCols = current.territoryBoard.cols,
+                    territorySquares = current.territoryBoard.toSquareDtoList(),
+                    players = current.players.map { it.toDto() },
+                    winnerId = opponent?.id
+                )
+                multiplayerRepository?.updateGameState(roomCode, roomDto)
+            }
         }
     }
 
