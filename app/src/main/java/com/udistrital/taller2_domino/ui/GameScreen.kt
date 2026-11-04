@@ -1,8 +1,6 @@
 package com.udistrital.taller2_domino.ui
 
-import com.udistrital.taller2_domino.ui.game.GameViewModel
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -19,12 +19,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.udistrital.taller2_domino.domain.model.Side
-import com.udistrital.taller2_domino.ui.components.ChainView
 import com.udistrital.taller2_domino.ui.components.HandView
+import com.udistrital.taller2_domino.ui.components.ScoreboardView
+import com.udistrital.taller2_domino.ui.components.TerritoryBoardView
+import com.udistrital.taller2_domino.ui.game.GameViewModel
 
 @Composable
 fun GameScreen(
@@ -32,64 +34,84 @@ fun GameScreen(
     viewModel: GameViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .systemBarsPadding()
-            .padding(16.dp),
+            .verticalScroll(scrollState)
+            .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Mesa", style = MaterialTheme.typography.titleLarge)
+        // 1. MARCADOR Y TURNO SUPERIOR
+        ScoreboardView(
+            players = state.players,
+            currentTurnIndex = state.currentTurnIndex
+        )
 
-        Box(
+        Spacer(Modifier.height(12.dp))
+
+        // 2. TABLERO DE DÓMINO Y CONQUISTAS (6x6 GRANDES EN PANTALLA)
+        Text("Tablero de Juego y Conquistas (6x6)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+
+        TerritoryBoardView(
+            board = state.territoryBoard,
+            players = state.players,
+            validPlacementSquares = state.validPlacementSquares,
+            onSquareClick = { r, c ->
+                viewModel.onSquareClicked(r, c)
+            },
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            ChainView(chain = state.chain)
-        }
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        )
 
+        // MENSAJES Y ANUNCIOS
         state.message?.let {
-            Text(it, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
+            )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(
-                onClick = { viewModel.onSideChosen(Side.Left) },
-                enabled = Side.Left in state.enabledSides
-            ) { Text("← Izquierda") }
+        Spacer(Modifier.height(8.dp))
 
-            OutlinedButton(
-                onClick = { viewModel.onSideChosen(Side.Right) },
-                enabled = Side.Right in state.enabledSides
-            ) { Text("Derecha →") }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        Row(){
+        // 3. POZO Y BOTÓN DE COMER FICHA
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Pozo: ${state.boneyard.size} fichas")
             OutlinedButton(
                 onClick = viewModel::onDrawTile,
-                enabled = state.canDraw
+                enabled = state.canDraw && !state.isGameOver
             ) {
-                Text("Pozo:${state.boneyard.size} fichas")
-                Text(" ---  Comer ficha")
+                Text("Comer ficha")
             }
         }
 
-        Text("Tu mano", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
+
+        // 4. MANO DEL JUGADOR ACTUAL
+        Text(
+            text = "Mano de ${state.currentPlayer?.name ?: ""}",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.height(4.dp))
 
         HandView(
-            hand = state.hand,
+            hand = state.currentPlayer?.hand ?: emptyList(),
             playableTiles = state.playableTiles,
             selectedTile = state.selectedTile,
             onTileClick = viewModel::onTileClicked
         )
 
+        Spacer(Modifier.height(8.dp))
         TextButton(onClick = viewModel::onNewGame) { Text("Nueva partida") }
     }
 }

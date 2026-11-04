@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -50,25 +51,46 @@ fun TileView(
     left: Int,
     right: Int,
     modifier: Modifier = Modifier,
-    faceSize: Dp = 44.dp,
-    borderColor: Color = Color.DarkGray
+    faceSize: Dp = 32.dp,
+    borderColor: Color = Color.DarkGray,
+    isVertical: Boolean = false
 ) {
-    val shape = RoundedCornerShape(8.dp)
-    Row(
-        modifier = modifier
-            .clip(shape)
-            .background(Color(0xFFFFFBEA))
-            .border(2.dp, borderColor, shape)
-            .padding(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Face(left, Modifier.size(faceSize))
-        Box(
-            modifier = Modifier
-                .width(2.dp)
-                .height(faceSize * 0.8f)
-                .background(Color.Gray)
-        )
-        Face(right, Modifier.size(faceSize))
+    val shape = RoundedCornerShape(4.dp)
+    if (isVertical) {
+        Column(
+            modifier = modifier
+                .clip(shape)
+                .background(Color(0xFFFFFBEA))
+                .border(1.dp, borderColor, shape)
+                .padding(2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Face(left, Modifier.size(faceSize))
+            Box(
+                modifier = Modifier
+                    .width(faceSize * 0.8f)
+                    .height(1.dp)
+                    .background(Color.Gray)
+            )
+            Face(right, Modifier.size(faceSize))
+        }
+    } else {
+        Row(
+            modifier = modifier
+                .clip(shape)
+                .background(Color(0xFFFFFBEA))
+                .border(1.dp, borderColor, shape)
+                .padding(2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Face(left, Modifier.size(faceSize))
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(faceSize * 0.8f)
+                    .background(Color.Gray)
+            )
+            Face(right, Modifier.size(faceSize))
+        }
     }
 }
