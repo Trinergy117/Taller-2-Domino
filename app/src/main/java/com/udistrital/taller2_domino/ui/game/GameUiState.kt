@@ -7,6 +7,8 @@ import com.udistrital.taller2_domino.domain.model.TerritoryBoard
 import com.udistrital.taller2_domino.domain.model.Tile
 
 data class GameUiState(
+    val roomCode: String? = null,
+    val localUserId: String? = null,
     val chain: Chain = Chain(),
     val territoryBoard: TerritoryBoard = TerritoryBoard.createRandom(6, 6),
     val players: List<Player> = emptyList(),
@@ -19,12 +21,17 @@ data class GameUiState(
     val isGameOver: Boolean = false,
     val winner: Player? = null
 ) {
-    val canDraw: Boolean get() = boneyard.isNotEmpty() && playableTiles.isEmpty()
+    val isOnlineGame: Boolean get() = !roomCode.isNullOrBlank()
     val currentPlayer: Player? get() = players.getOrNull(currentTurnIndex)
-    val hand: List<Tile> get() = currentPlayer?.hand ?: emptyList()
+    val isMyTurn: Boolean get() = !isOnlineGame || (currentPlayer != null && currentPlayer?.id == localUserId)
+
+    val localPlayer: Player? get() = if (isOnlineGame) players.find { it.id == localUserId } else currentPlayer
+    val localHand: List<Tile> get() = localPlayer?.hand ?: emptyList()
+
+    val canDraw: Boolean get() = boneyard.isNotEmpty() && playableTiles.isEmpty() && isMyTurn
 
     val playableTiles: Set<Tile> get() {
-        val currentHand = currentPlayer?.hand ?: return emptySet()
+        val currentHand = localHand
         if (territoryBoard.isBoardEmpty) return currentHand.toSet()
         return currentHand.filter { territoryBoard.validSquaresFor(it).isNotEmpty() }.toSet()
     }
