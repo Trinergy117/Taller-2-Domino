@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "1234567890",
-    "project_id": "taller2-domino-dummy",
-    "storage_bucket": "taller2-domino-dummy.appspot.com"
+    "project_number": "365025996765",
+    "project_id": "taller-2-domino",
+    "storage_bucket": "taller-2-domino.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1234567890:android:1234567890abcdef",
+        "mobilesdk_app_id": "1:365025996765:android:63705b18478a2322651034",
         "android_client_info": {
           "package_name": "com.udistrital.taller2_domino"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDummyKeyForDevelopment123456"
+          "current_key": "AIzaSyBNaJELtbK3zvopE69DA0YleRpCHM3_GZI"
         }
       ],
       "services": {
