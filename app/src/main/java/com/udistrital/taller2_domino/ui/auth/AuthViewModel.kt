@@ -10,12 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-sealed interface AuthUiState {
-    data object Idle : AuthUiState
-    data object Loading : AuthUiState
-    data class Success(val user: FirebaseUser) : AuthUiState
-    data class Error(val message: String) : AuthUiState
-}
+
 
 class AuthViewModel(
     private val authRepository: AuthRepository = FirebaseAuthRepository()

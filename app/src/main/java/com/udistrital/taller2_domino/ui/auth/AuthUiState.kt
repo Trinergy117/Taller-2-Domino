@@ -1,10 +1,10 @@
 package com.udistrital.taller2_domino.ui.auth
 
-data class AuthUiState(
-    val email: String = "david080221@gmail.com",
-    val password: String = "1234cincoseis",
-    val isLoading: Boolean = false,
-    val isLoggedIn: Boolean = false,
-    val errorMessage: String? = null,
-    val userEmail: String? = null
-)
+import com.google.firebase.auth.FirebaseUser
+
+sealed interface AuthUiState {
+    data object Idle : AuthUiState
+    data object Loading : AuthUiState
+    data class Success(val user: FirebaseUser) : AuthUiState
+    data class Error(val message: String) : AuthUiState
+}
