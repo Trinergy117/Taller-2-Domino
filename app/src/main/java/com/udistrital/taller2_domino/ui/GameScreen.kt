@@ -1,6 +1,8 @@
 package com.udistrital.taller2_domino.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -21,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.udistrital.taller2_domino.ui.components.HandView
@@ -30,8 +35,17 @@ import com.udistrital.taller2_domino.ui.game.GameViewModel
 
 @Composable
 fun GameScreen(
+    roomCode: String? = null,
+    localUserId: String? = null,
     modifier: Modifier = Modifier,
-    viewModel: GameViewModel = viewModel()
+    viewModel: GameViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return GameViewModel(roomCode = roomCode, localUserId = localUserId) as T
+            }
+        }
+    )
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
@@ -44,6 +58,30 @@ fun GameScreen(
             .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // BANNER DE MODO ONLINE
+        if (state.isOnlineGame) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        if (state.isMyTurn) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.secondaryContainer,
+                        RoundedCornerShape(8.dp)
+                    )
+                    .padding(vertical = 8.dp, horizontal = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (state.isMyTurn) "🟢 ¡Es tu turno!" else "⌛ Turno de ${state.currentPlayer?.name ?: "rival"}...",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (state.isMyTurn) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
         // 1. MARCADOR Y TURNO SUPERIOR
         ScoreboardView(
             players = state.players,
@@ -96,22 +134,24 @@ fun GameScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // 4. MANO DEL JUGADOR ACTUAL
+        // 4. MANO DEL JUGADOR
         Text(
-            text = "Mano de ${state.currentPlayer?.name ?: ""}",
+            text = "Tu Mano (${state.localPlayer?.name ?: ""})",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
         Spacer(Modifier.height(4.dp))
 
         HandView(
-            hand = state.currentPlayer?.hand ?: emptyList(),
+            hand = state.localHand,
             playableTiles = state.playableTiles,
             selectedTile = state.selectedTile,
             onTileClick = viewModel::onTileClicked
         )
 
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = viewModel::onNewGame) { Text("Nueva partida") }
+        if (!state.isOnlineGame) {
+            TextButton(onClick = viewModel::onNewGame) { Text("Nueva partida") }
+        }
     }
 }

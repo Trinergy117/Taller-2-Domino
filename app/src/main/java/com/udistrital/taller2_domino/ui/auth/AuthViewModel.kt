@@ -1,70 +1,91 @@
 package com.udistrital.taller2_domino.ui.auth
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseUser
+import com.udistrital.taller2_domino.data.repository.AuthRepository
+import com.udistrital.taller2_domino.data.repository.FirebaseAuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
-class AuthViewModel : ViewModel() {
+sealed interface AuthUiState {
+    data object Idle : AuthUiState
+    data object Loading : AuthUiState
+    data class Success(val user: FirebaseUser) : AuthUiState
+    data class Error(val message: String) : AuthUiState
+}
 
-    private val _uiState = MutableStateFlow(AuthUiState())
+class AuthViewModel(
+    private val authRepository: AuthRepository = FirebaseAuthRepository()
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    // Base de datos local de usuarios registrados (inicia con el usuario de prueba)
-    private val registeredUsers = mutableMapOf(
-        "david080221@gmail.com" to "1234cincoseis"
-    )
+    val currentUserFlow: StateFlow<FirebaseUser?> = authRepository.currentUserFlow
+    val currentUser: FirebaseUser? get() = authRepository.currentUser
 
-    fun onEmailChanged(email: String) {
-        _uiState.update { it.copy(email = email.trim(), errorMessage = null) }
-    }
-
-    fun onPasswordChanged(password: String) {
-        _uiState.update { it.copy(password = password.trim(), errorMessage = null) }
-    }
-
-    fun onLoginClicked() {
-        val current = _uiState.value
-        if (current.email.isEmpty() || current.password.isEmpty()) {
-            _uiState.update { it.copy(errorMessage = "Por favor ingrese correo y contraseña") }
+    fun signInWithEmail(email: String, password: String) {
+        if (email.isBlank() || password.isBlank()) {
+            _uiState.value = AuthUiState.Error("Ingresa un correo y contraseña válidos")
             return
         }
 
-        val expectedPassword = registeredUsers[current.email]
-        if (expectedPassword == null) {
-            _uiState.update { it.copy(errorMessage = "El usuario no existe. Regístrese primero.") }
-        } else if (expectedPassword != current.password) {
-            _uiState.update { it.copy(errorMessage = "Contraseña incorrecta") }
-        } else {
-            _uiState.update {
-                it.copy(
-                    isLoggedIn = true,
-                    userEmail = current.email,
-                    errorMessage = null
-                )
-            }
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            authRepository.signInWithEmail(email.trim(), password)
+                .onSuccess { user ->
+                    _uiState.value = AuthUiState.Success(user)
+                }
+                .onFailure { exception ->
+                    _uiState.value = AuthUiState.Error(exception.localizedMessage ?: "Error al iniciar sesión")
+                }
         }
     }
 
-    fun onRegisterClicked() {
-        val current = _uiState.value
-        if (current.email.isEmpty() || current.password.isEmpty()) {
-            _uiState.update { it.copy(errorMessage = "Ingrese correo y contraseña para registrarse") }
+    fun signUpWithEmail(email: String, password: String) {
+        if (email.isBlank() || password.isBlank()) {
+            _uiState.value = AuthUiState.Error("Ingresa un correo y contraseña válidos")
+            return
+        }
+        if (password.length < 6) {
+            _uiState.value = AuthUiState.Error("La contraseña debe tener al menos 6 caracteres")
             return
         }
 
-        if (registeredUsers.containsKey(current.email)) {
-            _uiState.update { it.copy(errorMessage = "El usuario ya está registrado. Inicie sesión.") }
-        } else {
-            registeredUsers[current.email] = current.password
-            _uiState.update {
-                it.copy(
-                    isLoggedIn = true,
-                    userEmail = current.email,
-                    errorMessage = "¡Registro exitoso! Sesión iniciada."
-                )
-            }
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            authRepository.signUpWithEmail(email.trim(), password)
+                .onSuccess { user ->
+                    _uiState.value = AuthUiState.Success(user)
+                }
+                .onFailure { exception ->
+                    _uiState.value = AuthUiState.Error(exception.localizedMessage ?: "Error al registrarse")
+                }
         }
+    }
+
+    fun signInAnonymously() {
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            authRepository.signInAnonymously()
+                .onSuccess { user ->
+                    _uiState.value = AuthUiState.Success(user)
+                }
+                .onFailure { exception ->
+                    _uiState.value = AuthUiState.Error(exception.localizedMessage ?: "Error al ingresar como invitado")
+                }
+        }
+    }
+
+    fun signOut() {
+        authRepository.signOut()
+        _uiState.value = AuthUiState.Idle
+    }
+
+    fun resetState() {
+        _uiState.value = AuthUiState.Idle
     }
 }

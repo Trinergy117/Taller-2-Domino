@@ -8,24 +8,29 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -33,15 +38,45 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: AuthViewModel = viewModel()
+    authViewModel: AuthViewModel = viewModel()
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val uiState by authViewModel.uiState.collectAsStateWithLifecycle()
+    val currentUser by authViewModel.currentUserFlow.collectAsStateWithLifecycle()
 
-    LaunchedEffect(state.isLoggedIn) {
-        if (state.isLoggedIn) {
+    LaunchedEffect(currentUser) {
+        if (currentUser != null) {
             onLoginSuccess()
         }
     }
+
+    LaunchedEffect(uiState) {
+        if (uiState is AuthUiState.Success) {
+            onLoginSuccess()
+        }
+    }
+
+    LoginScreenContent(
+        uiState = uiState,
+        onSignIn = authViewModel::signInWithEmail,
+        onSignUp = authViewModel::signUpWithEmail,
+        onSignInAnonymously = authViewModel::signInAnonymously,
+        onResetState = authViewModel::resetState,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun LoginScreenContent(
+    uiState: AuthUiState,
+    onSignIn: (String, String) -> Unit,
+    onSignUp: (String, String) -> Unit,
+    onSignInAnonymously: () -> Unit,
+    onResetState: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var isRegisterMode by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -50,44 +85,20 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        Text("Domino", style = MaterialTheme.typography.displayLarge)
         Text(
-            text = "🀄 Dominó Modificado",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "Gestión de Usuarios y Login",
+            text = if (isRegisterMode) "Crear nueva cuenta" else "Iniciar Sesión",
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.secondary
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary
         )
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Usuario de Prueba Preregistrado:",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(text = "Correo: david080221@gmail.com", fontSize = 11.sp)
-                Text(text = "Clave: 1234cincoseis", fontSize = 11.sp)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
         OutlinedTextField(
-            value = state.email,
-            onValueChange = viewModel::onEmailChanged,
-            label = { Text("Correo electrónico") },
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Correo Electrónico") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             modifier = Modifier.fillMaxWidth()
@@ -96,8 +107,8 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         OutlinedTextField(
-            value = state.password,
-            onValueChange = viewModel::onPasswordChanged,
+            value = password,
+            onValueChange = { password = it },
             label = { Text("Contraseña") },
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
@@ -105,10 +116,10 @@ fun LoginScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
-        state.errorMessage?.let { error ->
+        if (uiState is AuthUiState.Error) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = error,
+                text = uiState.message,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall
             )
@@ -116,23 +127,70 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OutlinedButton(
-                onClick = viewModel::onRegisterClicked,
-                modifier = Modifier.weight(1f)
+        if (uiState is AuthUiState.Loading) {
+            CircularProgressIndicator(modifier = Modifier.size(48.dp))
+        } else {
+            Button(
+                onClick = {
+                    if (isRegisterMode) {
+                        onSignUp(email, password)
+                    } else {
+                        onSignIn(email, password)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Registrarse")
+                Text(if (isRegisterMode) "Registrarse" else "Ingresar")
             }
 
-            Button(
-                onClick = viewModel::onLoginClicked,
-                modifier = Modifier.weight(1f)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            TextButton(
+                onClick = {
+                    isRegisterMode = !isRegisterMode
+                    onResetState()
+                }
             ) {
-                Text("Iniciar Sesión")
+                Text(
+                    if (isRegisterMode) "¿Ya tienes cuenta? Inicia Sesión"
+                    else "¿No tienes cuenta? Regístrate aquí"
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HorizontalDivider(modifier = Modifier.weight(1f))
+                Text(
+                    text = " O ",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+                HorizontalDivider(modifier = Modifier.weight(1f))
+            }
+
+            OutlinedButton(
+                onClick = onSignInAnonymously,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Entrar como Invitado")
             }
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoginScreenPreview() {
+    LoginScreenContent(
+        uiState = AuthUiState.Idle,
+        onSignIn = { _, _ -> },
+        onSignUp = { _, _ -> },
+        onSignInAnonymously = {},
+        onResetState = {}
+    )
 }
