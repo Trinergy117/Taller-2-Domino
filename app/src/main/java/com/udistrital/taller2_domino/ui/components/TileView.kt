@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -32,13 +33,13 @@ private val PIPS: Map<Int, List<Pair<Int, Int>>> = mapOf(
 )
 
 @Composable
-private fun Face(value: Int, modifier: Modifier = Modifier) {
+private fun Face(value: Int, pipColor: Color = Color(0xFF0F172A), modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
         val cell = size.minDimension / 3f
         val radius = cell * 0.28f
         PIPS.getValue(value).forEach { (col, row) ->
             drawCircle(
-                color = Color.Black,
+                color = pipColor,
                 radius = radius,
                 center = Offset(cell * (col + 0.5f), cell * (row + 0.5f))
             )
@@ -52,45 +53,51 @@ fun TileView(
     right: Int,
     modifier: Modifier = Modifier,
     faceSize: Dp = 32.dp,
-    borderColor: Color = Color.DarkGray,
-    isVertical: Boolean = false
+    borderColor: Color = Color(0xFF64748B),
+    isVertical: Boolean = false,
+    tileColor: Color = Color(0xFFFFFBEA),
+    pipColor: Color = Color(0xFF0F172A)
 ) {
-    val shape = RoundedCornerShape(4.dp)
+    val shape = RoundedCornerShape(6.dp)
+    val borderWidth = if (borderColor == Color(0xFFF9A825) || borderColor == Color(0xFF2E7D32)) 2.dp else 1.dp
+
     if (isVertical) {
         Column(
             modifier = modifier
+                .shadow(2.dp, shape)
                 .clip(shape)
-                .background(Color(0xFFFFFBEA))
-                .border(1.dp, borderColor, shape)
+                .background(tileColor)
+                .border(borderWidth, borderColor, shape)
                 .padding(2.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Face(left, Modifier.size(faceSize))
+            Face(left, pipColor, Modifier.size(faceSize))
             Box(
                 modifier = Modifier
-                    .width(faceSize * 0.8f)
-                    .height(1.dp)
-                    .background(Color.Gray)
+                    .width(faceSize * 0.85f)
+                    .height(1.5.dp)
+                    .background(Color(0xFFD97706))
             )
-            Face(right, Modifier.size(faceSize))
+            Face(right, pipColor, Modifier.size(faceSize))
         }
     } else {
         Row(
             modifier = modifier
+                .shadow(2.dp, shape)
                 .clip(shape)
-                .background(Color(0xFFFFFBEA))
-                .border(1.dp, borderColor, shape)
+                .background(tileColor)
+                .border(borderWidth, borderColor, shape)
                 .padding(2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Face(left, Modifier.size(faceSize))
+            Face(left, pipColor, Modifier.size(faceSize))
             Box(
                 modifier = Modifier
-                    .width(1.dp)
-                    .height(faceSize * 0.8f)
-                    .background(Color.Gray)
+                    .width(1.5.dp)
+                    .height(faceSize * 0.85f)
+                    .background(Color(0xFFD97706))
             )
-            Face(right, Modifier.size(faceSize))
+            Face(right, pipColor, Modifier.size(faceSize))
         }
     }
 }

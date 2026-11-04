@@ -62,13 +62,14 @@ fun GameScreen(
     if (showAbandonDialog) {
         AlertDialog(
             onDismissRequest = { showAbandonDialog = false },
-            title = { Text("Abandonar Partida") },
+            title = { Text("Abandonar Sala") },
             text = { Text("¿Estás seguro de que deseas abandonar la partida online?") },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showAbandonDialog = false
                         viewModel.onAbandonGame()
+                        onBackToMenu()
                     }
                 ) {
                     Text("Sí, Abandonar", color = MaterialTheme.colorScheme.error)
@@ -87,7 +88,7 @@ fun GameScreen(
         AlertDialog(
             onDismissRequest = {},
             title = { Text("Partida Finalizada") },
-            text = { Text("El oponente ${state.abandonedByName} ha abandonado la partida. ¡Has ganado por abandono!") },
+            text = { Text("El oponente ${state.abandonedByName} ha abandonado la sala.") },
             confirmButton = {
                 Button(onClick = onBackToMenu) {
                     Text("Volver al Menú Principal")
@@ -96,20 +97,25 @@ fun GameScreen(
         )
     }
 
-    // DIÁLOGO CUANDO EL OPONENTE SOLICITA REINICIO
+    // DIÁLOGO CUANDO EL OPONENTE SOLICITA REVANCHA / REINICIO
     if (state.isRestartRequestedByOpponent) {
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("Solicitud de Reinicio") },
-            text = { Text("El oponente ${state.restartRequestedByName ?: "rival"} desea reiniciar la partida. ¿Deseas aceptar o abandonar la sala?") },
+            title = { Text("¡Solicitud de Revancha!") },
+            text = { Text("El oponente ${state.restartRequestedByName ?: "rival"} ha solicitado una revancha. ¿Deseas aceptar o salir al menú?") },
             confirmButton = {
                 Button(onClick = viewModel::onAcceptRestart) {
-                    Text("Aceptar Reinicio")
+                    Text("Aceptar Revancha")
                 }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::onAbandonGame) {
-                    Text("Abandonar Partida", color = MaterialTheme.colorScheme.error)
+                TextButton(
+                    onClick = {
+                        viewModel.onAbandonGame()
+                        onBackToMenu()
+                    }
+                ) {
+                    Text("Abandonar Sala", color = MaterialTheme.colorScheme.error)
                 }
             }
         )
@@ -129,8 +135,11 @@ fun GameScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        if (state.isMyTurn) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.secondaryContainer,
+                        when {
+                            state.isWaitingRestartResponse -> MaterialTheme.colorScheme.secondaryContainer
+                            state.isMyTurn -> MaterialTheme.colorScheme.primaryContainer
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        },
                         RoundedCornerShape(8.dp)
                     )
                     .padding(vertical = 8.dp, horizontal = 12.dp),
@@ -138,14 +147,18 @@ fun GameScreen(
             ) {
                 Text(
                     text = when {
-                        state.isWaitingRestartResponse -> "⌛ Solicitud de reinicio enviada. Esperando al rival..."
+                        state.isWaitingRestartResponse -> "⌛ Solicitud enviada. Esperando al rival..."
+                        state.isGameOver -> "🏁 ¡Partida Finalizada!"
                         state.isMyTurn -> "🟢 ¡Es tu turno!"
                         else -> "⌛ Turno de ${state.currentPlayer?.name ?: "rival"}..."
                     },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (state.isMyTurn) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSecondaryContainer
+                    color = when {
+                        state.isWaitingRestartResponse -> MaterialTheme.colorScheme.onSecondaryContainer
+                        state.isMyTurn -> MaterialTheme.colorScheme.onPrimaryContainer
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                 )
             }
             Spacer(Modifier.height(8.dp))
@@ -160,7 +173,12 @@ fun GameScreen(
         Spacer(Modifier.height(12.dp))
 
         // 2. TABLERO DE DÓMINO Y CONQUISTAS (6x6 GRANDES EN PANTALLA)
-        Text("Tablero de Juego y Conquistas (6x6)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(
+            text = "Tablero de Juego y Conquistas (6x6)",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
 
         TerritoryBoardView(
             board = state.territoryBoard,
@@ -192,7 +210,10 @@ fun GameScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Pozo: ${state.boneyard.size} fichas")
+            Text(
+                text = "Pozo: ${state.boneyard.size} fichas",
+                color = MaterialTheme.colorScheme.onBackground
+            )
             OutlinedButton(
                 onClick = viewModel::onDrawTile,
                 enabled = state.canDraw && !state.isGameOver
@@ -207,7 +228,8 @@ fun GameScreen(
         Text(
             text = "Tu Mano (${state.localPlayer?.name ?: ""})",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(Modifier.height(4.dp))
 
@@ -218,30 +240,41 @@ fun GameScreen(
             onTileClick = viewModel::onTileClicked
         )
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(16.dp))
+
         if (!state.isOnlineGame) {
-            TextButton(onClick = viewModel::onNewGame) { Text("Nueva partida") }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                TextButton(onClick = viewModel::onNewGame) { Text("Nueva partida") }
+                TextButton(onClick = onBackToMenu) {
+                    Text(
+                        text = "Volver al Menú Principal",
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
         } else {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedButton(
+                Button(
                     onClick = viewModel::onRequestRestart,
-                    enabled = !state.isGameOver && !state.isWaitingRestartResponse
+                    enabled = !state.isWaitingRestartResponse
                 ) {
-                    Text("Reiniciar Partida")
+                    Text(if (state.isGameOver) "Revancha" else "Reiniciar Partida")
                 }
                 OutlinedButton(
-                    onClick = { showAbandonDialog = true },
-                    enabled = !state.isGameOver
-                ) {
-                    Text("Abandonar Partida", color = MaterialTheme.colorScheme.error)
-                }
-                if (state.isGameOver) {
-                    Button(onClick = onBackToMenu) {
-                        Text("Salir al Menú")
+                    onClick = {
+                        if (state.isGameOver) {
+                            viewModel.onAbandonGame()
+                            onBackToMenu()
+                        } else {
+                            showAbandonDialog = true
+                        }
                     }
+                ) {
+                    Text("Abandonar Sala", color = MaterialTheme.colorScheme.error)
                 }
             }
         }

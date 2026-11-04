@@ -1,6 +1,5 @@
 package com.udistrital.taller2_domino.ui
 
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.tooling.preview.Preview
@@ -40,7 +39,6 @@ fun AppNavigation(
                 userEmail = currentUser?.email ?: if (currentUser?.isAnonymous == true) "Invitado" else null,
                 onNewGame = { navController.navigate("game") },
                 onOnlineGame = { navController.navigate("lobby") },
-                onSavedGames = { navController.navigate("saved") },
                 onSignOut = {
                     authViewModel.signOut()
                     navController.navigate("login") {
@@ -80,7 +78,6 @@ fun AppNavigation(
                 onBackToMenu = { navController.navigate("menu") { popUpTo("menu") { inclusive = true } } }
             )
         }
-        composable("saved") { Text("Partidas guardadas") }
     }
 }
 
